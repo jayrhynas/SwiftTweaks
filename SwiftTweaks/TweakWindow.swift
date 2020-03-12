@@ -32,10 +32,10 @@ import UIKit
 	private static let shakeWindowTimeInterval: Double = 0.4
 
 	/// The GestureType used to determine when to present the UI.
-	private let gestureType: GestureType
+	private let gestureType: GestureType?
 
 	/// By holding on to the TweaksViewController, we get easy state restoration!
-	private var tweaksViewController: TweaksViewController! // requires self for init
+	public private(set) var tweaksViewController: TweaksViewController! // requires self for init
 
 	/// Represents the "floating tweaks UI"
 	fileprivate var floatingTweakGroupUIWindow: HitTransparentWindow?
@@ -48,7 +48,7 @@ import UIKit
 	private var shaking: Bool = false
 
 	private var shouldShakePresentTweaks: Bool {
-		if tweakStore.enabled {
+		if tweakStore.enabled, let gestureType = gestureType {
 			switch gestureType {
 			case .shake: return shaking || runningInSimulator
 			case .twoFingerDoubleTap, .gesture: return false
@@ -60,7 +60,7 @@ import UIKit
 
 	// MARK: Init
 
-	public init(frame: CGRect, gestureType: GestureType = .shake, tweakStore: TweakStore) {
+	public init(frame: CGRect, gestureType: GestureType? = .shake, tweakStore: TweakStore) {
 		self.gestureType = gestureType
 
 		self.tweakStore = tweakStore
@@ -76,7 +76,7 @@ import UIKit
 
 		tintColor = AppTheme.Colors.controlTinted
 
-		if tweakStore.enabled {
+		if tweakStore.enabled, let gestureType = gestureType {
 			switch gestureType {
 			case .gesture(let gestureRecognizer):
 				gestureRecognizer.addTarget(self, action: #selector(self.presentTweaks))
@@ -124,7 +124,7 @@ import UIKit
 
 	// MARK: Presenting & Dismissing
 
-	@objc private func presentTweaks() {
+	@objc public func presentTweaks() {
 		guard let rootViewController = rootViewController else {
 			return
 		}
@@ -165,24 +165,29 @@ extension TweakWindow: FloatingTweaksWindowPresenter {
 
 
 	/// Presents a floating TweakGroup over your app's UI, so you don't have to hop in and out of the full-modal Tweak UI.
-	internal func presentFloatingTweaksUI(forTweakGroup tweakGroup: TweakGroup) {
+    internal func presentFloatingTweaksUI(forTweakGroup tweakGroup: TweakGroup, inTweakCollection tweakCollection: TweakCollection) {
 		if (floatingTweakGroupUIWindow == nil) {
 			let window = HitTransparentWindow()
 			window.frame = UIScreen.main.bounds
 			window.backgroundColor = UIColor.clear
 
+            let maxWidth: CGFloat = 450
+            let width = min(window.frame.size.width - FloatingTweakGroupViewController.margins*2, maxWidth)
+            let height = max(window.frame.size.height / 3.0, FloatingTweakGroupViewController.minHeight)
+            
 			let floatingTweakGroupFrame = CGRect(
 				origin: CGPoint(
-					x: FloatingTweakGroupViewController.margins,
-					y: window.frame.size.height - FloatingTweakGroupViewController.height - FloatingTweakGroupViewController.margins
+					x: window.frame.size.width - FloatingTweakGroupViewController.margins - width,
+					y: window.frame.size.height - height - FloatingTweakGroupViewController.margins
 				),
 				size: CGSize(
-					width: window.frame.size.width - FloatingTweakGroupViewController.margins*2,
-					height: FloatingTweakGroupViewController.height
+					width: width,
+					height: height
 				)
 			)
 
 			let floatingTweaksVC = FloatingTweakGroupViewController(frame: floatingTweakGroupFrame, tweakStore: tweakStore, presenter: self)
+            floatingTweaksVC.tweakCollection = tweakCollection
 			floatingTweaksVC.tweakGroup = tweakGroup
 			window.rootViewController = floatingTweaksVC
 			window.addSubview(floatingTweaksVC.view)

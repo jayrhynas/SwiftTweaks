@@ -12,7 +12,7 @@ import UIKit
 // MARK: - FloatingTweaksWindowPresenter
 
 internal protocol FloatingTweaksWindowPresenter {
-	func presentFloatingTweaksUI(forTweakGroup tweakGroup: TweakGroup)
+    func presentFloatingTweaksUI(forTweakGroup tweakGroup: TweakGroup, inTweakCollection tweakCollection: TweakCollection)
 	func dismissFloatingTweaksUI()
 }
 
@@ -20,40 +20,89 @@ internal protocol FloatingTweaksWindowPresenter {
 
 /// A "floating" UI for a particular TweakGroup.
 internal final class FloatingTweakGroupViewController: UIViewController {
+    var tweakCollection: TweakCollection? {
+        didSet {
+            self.updateTitle()
+        }
+    }
+    
 	var tweakGroup: TweakGroup? {
 		didSet {
-			titleLabel.text = tweakGroup?.title
+            self.updateTitle()
 			self.tableView.reloadData()
 		}
 	}
+    
+    private func updateTitle() {
+        titleLabel.text = [tweakCollection?.title, tweakGroup?.title].compactMap { $0 }.joined(separator: " | ")
+    }
 
 	private let presenter: FloatingTweaksWindowPresenter
 	fileprivate let tweakStore: TweakStore
-	private let fullFrame: CGRect
-
+	private var fullFrame: CGRect
+    private var corner: Corner
+    
 	internal init(frame: CGRect, tweakStore: TweakStore, presenter: FloatingTweaksWindowPresenter) {
 		self.tweakStore = tweakStore
 		self.presenter = presenter
 		self.fullFrame = frame
-
+        self.corner = (v: .bottom, h: .right)
+        
 		super.init(nibName: nil, bundle: nil)
 
 		view.frame = frame
+        self.corner = self.corner(for: frame)
 	}
 	
 	required init?(coder aDecoder: NSCoder) {
 		fatalError("init(coder:) has not been implemented")
 	}
 
-	internal var minimizedFrameOriginX: CGFloat {
-		return fullFrame.size.width - FloatingTweakGroupViewController.minimizedWidth + FloatingTweakGroupViewController.margins * 2
+    private func fullFrameOrigin(for corner: Corner) -> CGPoint {
+        let margin = FloatingTweakGroupViewController.margins
+
+        guard let window = view.window else {
+            return fullFrame.origin
+        }
+        
+        var origin = CGPoint.zero
+        switch corner.h {
+        case .left:  origin.x = margin
+        case .right: origin.x = window.frame.width - margin - fullFrame.width
+        }
+        
+        switch corner.v {
+        case .top:    origin.y = margin
+        case .bottom: origin.y = window.frame.height - margin - fullFrame.height
+        }
+        
+        return origin
+    }
+    
+    private func minimizedFrameOrigin(for corner: Corner) -> CGPoint {
+        let margin = FloatingTweakGroupViewController.margins
+        let minWidth = FloatingTweakGroupViewController.minimizedWidth
+        
+        guard let window = view.window else {
+            return CGPoint(x: fullFrame.width - minWidth + margin * 2,
+                           y: fullFrame.minY)
+        }
+        
+        var origin = self.fullFrameOrigin(for: corner)
+        switch corner.h {
+        case .left:  origin.x = minWidth - fullFrame.width
+        case .right: origin.x = window.frame.width - minWidth
+        }
+        
+        return origin
 	}
 
 	override func viewDidLoad() {
 		super.viewDidLoad()
 
 		installSubviews()
-		layoutSubviews()
+        
+        self.setupKeyboardNotifications()
 	}
 
 	override func viewDidAppear(_ animated: Bool) {
@@ -68,9 +117,33 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 		layoutSubviews()
 	}
 
+    override var prefersStatusBarHidden: Bool {
+        if let rootVC = UIApplication.shared.keyWindow?.rootViewController, rootVC != self {
+            return rootVC.prefersStatusBarHidden
+        } else {
+            return super.prefersStatusBarHidden
+        }
+    }
+    
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        if let rootVC = UIApplication.shared.keyWindow?.rootViewController, rootVC != self {
+            return rootVC.preferredStatusBarStyle
+        } else {
+            return super.preferredStatusBarStyle
+        }
+    }
+    
+    override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
+        if let rootVC = UIApplication.shared.keyWindow?.rootViewController, rootVC != self {
+            return rootVC.preferredStatusBarUpdateAnimation
+        } else {
+            return super.preferredStatusBarUpdateAnimation
+        }
+    }
+    
 	// MARK: Subviews
 
-	internal static let height: CGFloat = 168
+	internal static let minHeight: CGFloat = 168
 	internal static let margins: CGFloat = 5
 	private static let minimizedWidth: CGFloat = 30
 
@@ -146,7 +219,7 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 		view.addSubview(navBar)
 
 		// The restore button
-		restoreButton.addTarget(self, action: #selector(self.restore), for: .touchUpInside)
+        restoreButton.addTarget(self, action: #selector(self.restore(_:)), for: .touchUpInside)
 		view.addSubview(restoreButton)
 
 		// The pan gesture recognizer
@@ -156,7 +229,7 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 	}
 
 	private func layoutSubviews() {
-		tableView.frame = CGRect(origin: .zero, size: CGSize(width: view.bounds.width, height: FloatingTweakGroupViewController.height))
+		tableView.frame = CGRect(origin: .zero, size: view.bounds.size)
 
 		tableView.scrollIndicatorInsets = UIEdgeInsets(
 			top: tableView.contentInset.top,
@@ -202,26 +275,120 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 		)
 	}
 
+    // MARK: Notifications
+    
+    private var prevCorner: Corner?
+    
+    private func setupKeyboardNotifications() {
+        NotificationCenter.default.addObserver(forName: .UIKeyboardWillShow, object: nil, queue: .main) { notif in
+            if self.corner.v == .bottom {
+                self.prevCorner = self.corner
+                
+                self.animateAlongsideKeyboard(notification: notif, animations: { animated in
+                    self.restore(to: Corner(v: .top, h: self.corner.h), animated: !animated)
+                }, completion: nil)
+            } else {
+                self.prevCorner = nil
+            }
+        }
+        
+        NotificationCenter.default.addObserver(forName: .UIKeyboardWillHide, object: nil, queue: .main) { notif in
+            if let prev = self.prevCorner {
+                self.animateAlongsideKeyboard(notification: notif, animations: { animated in
+                    self.restore(to: prev, animated: !animated)
+                }, completion: nil)
+            }
+        }
+    }
+    
+    private func animateAlongsideKeyboard(notification: Notification, animations: @escaping (Bool) -> Void, completion: ((Bool) -> Void)?) {
+        guard let userInfo = notification.userInfo,
+              let duration = userInfo[UIKeyboardAnimationDurationUserInfoKey] as? Double,
+              let curve    = userInfo[UIKeyboardAnimationCurveUserInfoKey] as? UInt
+        else {
+            animations(false)
+            completion?(true)
+            return
+        }
+        
+        let options = UIViewAnimationOptions(rawValue: curve) ?? []
+        UIView.animate(withDuration: duration, delay: 0, options: options, animations: {
+            animations(true)
+        }, completion: completion)
+    }
+    
+    
 	// MARK: Actions
 
 	@objc private func closeButtonTapped() {
 		presenter.dismissFloatingTweaksUI()
 	}
-
+    
+    private enum VerticalDirection {
+        case top, bottom
+    }
+    private enum HorizontalDirection {
+        case left, right
+    }
+    
+    private typealias Corner = (v: VerticalDirection, h: HorizontalDirection)
+    
 	private static let gestureSpeedBreakpoint: CGFloat = 10
 	private static let gesturePositionBreakpoint: CGFloat = 30
 
+    private func corner(for frame: CGRect, velocity: CGPoint = .zero, in container: UIView? = nil) -> Corner {
+        guard let container = container ?? view.window else {
+            return (v: .bottom, h: .right)
+        }
+        
+        let center = CGPoint(x: frame.midX, y: frame.midY)
+        let bias = CGPoint(x: min(max(velocity.x / 1000.0, -0.25), 0.25),
+                           y: min(max(velocity.y / 1000.0, -0.25), 0.25))
+        
+        return (v: center.y < container.frame.height * (0.5 - bias.y) ? .top  : .bottom,
+                h: center.x < container.frame.width  * (0.5 - bias.x) ? .left : .right)
+    }
+    
 	@objc private func moveWindowPanGestureRecognized(_ gestureRecognizer: UIPanGestureRecognizer) {
 		switch (gestureRecognizer.state) {
 		case .began:
 			gestureRecognizer.setTranslation(self.view.frame.origin, in: self.view)
+            
 		case .changed:
-			view.frame.origin.x = gestureRecognizer.translation(in: self.view).x
+			view.frame.origin = gestureRecognizer.translation(in: self.view)
+            
 		case .possible, .ended, .cancelled, .failed:
-			let gestureIsMovingToTheRight = (gestureRecognizer.velocity(in: nil).x > FloatingTweakGroupViewController.gestureSpeedBreakpoint)
-			let viewIsKindaNearTheRight = view.frame.origin.x > FloatingTweakGroupViewController.gesturePositionBreakpoint
-			if gestureIsMovingToTheRight && viewIsKindaNearTheRight {
-				minimize()
+            let speedBreakpoint = FloatingTweakGroupViewController.gestureSpeedBreakpoint
+            let posBreakpoint   = FloatingTweakGroupViewController.gesturePositionBreakpoint
+            
+            let prevCorner = corner
+            
+            let velocity = gestureRecognizer.velocity(in: nil)
+            
+            corner = self.corner(for: view.frame, velocity: velocity)
+            fullFrame.origin = self.fullFrameOrigin(for: corner)
+
+            var gestureIsMovingToEdge: Bool {
+                guard abs(velocity.x) > abs(velocity.y) else {
+                    return false
+                }
+                
+                let vel = velocity.x
+                switch corner.h {
+                case .left:  return vel < -speedBreakpoint
+                case .right: return vel > speedBreakpoint
+                }
+            }
+
+            var viewIsKindaNearTheEdge: Bool {
+                switch corner.h {
+                case .left:  return view.frame.maxX < (fullFrame.maxX - posBreakpoint)
+                case .right: return view.frame.minX > (fullFrame.minX + posBreakpoint)
+                }
+            }
+            
+			if corner == prevCorner && gestureIsMovingToEdge && viewIsKindaNearTheEdge {
+                minimize(to: corner)
 			} else {
 				restore()
 			}
@@ -231,11 +398,21 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 	private static let minimizeAnimationDuration: Double = 0.3
 	private static let minimizeAnimationDamping: CGFloat = 0.8
 
-	private func minimize() {
+    private func minimize(to corner: Corner) {
 		// TODO map the continuous gesture's velocity into the animation.
 		self.restoreButton.alpha = 0
 		self.restoreButton.isHidden = false
 
+        switch corner.h {
+        case .left:
+            restoreButton.imageView?.transform = .init(scaleX: -1.0, y: 1.0)
+            restoreButton.frame.origin.x = view.frame.width - restoreButton.frame.width
+            
+        case .right:
+            restoreButton.imageView?.transform = .identity
+            restoreButton.frame.origin.x = 0
+        }
+        
 		UIView.animate(
 			withDuration: FloatingTweakGroupViewController.minimizeAnimationDuration,
 			delay: 0,
@@ -243,7 +420,7 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 			initialSpringVelocity: 0,
 			options: .beginFromCurrentState,
 			animations: {
-				self.view.frame.origin.x = self.minimizedFrameOriginX
+				self.view.frame.origin = self.minimizedFrameOrigin(for: corner)
 				self.tableView.alpha = 0
 				self.navBar.alpha = 0
 				self.restoreButton.alpha = 1
@@ -252,25 +429,44 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 		)
 	}
 
-	@objc private func restore() {
+    private func restore(to corner: Corner, animated: Bool = true) {
+        self.corner = corner
+        self.fullFrame.origin = self.fullFrameOrigin(for: corner)
+        self.restore(animated: animated)
+    }
+    
+    @objc private func restore(_ sender: UIButton) {
+        self.restore()
+    }
+    
+    private func restore(animated: Bool = true) {
 		// TODO map the continuous gesture's velocity into the animation
 
-		UIView.animate(
-			withDuration: FloatingTweakGroupViewController.minimizeAnimationDuration,
-			delay: 0,
-			usingSpringWithDamping: FloatingTweakGroupViewController.minimizeAnimationDamping,
-			initialSpringVelocity: 0,
-			options: .beginFromCurrentState,
-			animations: {
-				self.view.frame.origin.x = self.fullFrame.origin.x
-				self.tableView.alpha = 1
-				self.navBar.alpha = 1
-				self.restoreButton.alpha = 0
-			},
-			completion: { _ in
-				self.restoreButton.isHidden = true
-			}
-		)
+        let animations = {
+            self.view.frame.origin = self.fullFrame.origin
+            self.tableView.alpha = 1
+            self.navBar.alpha = 1
+            self.restoreButton.alpha = 0
+        }
+        
+        let completion = { (finished: Bool) in
+            self.restoreButton.isHidden = true
+        }
+        
+        if animated {
+            UIView.animate(
+                withDuration: FloatingTweakGroupViewController.minimizeAnimationDuration,
+                delay: 0,
+                usingSpringWithDamping: FloatingTweakGroupViewController.minimizeAnimationDamping,
+                initialSpringVelocity: 0,
+                options: .beginFromCurrentState,
+                animations: animations,
+                completion: completion
+            )
+        } else {
+            animations()
+            completion(true)
+        }
 	}
 }
 
@@ -299,14 +495,36 @@ extension FloatingTweakGroupViewController: UITableViewDelegate {
 			let alert = UIAlertController(title: "Can't edit colors here.", message: "Sorry, haven't built out the floating UI for it yet!", preferredStyle: .alert)
 			alert.addAction(UIAlertAction(title: "Dismiss", style: .default, handler: nil))
 			present(alert, animated: true, completion: nil)
-		case .stringList:
-			let alert = UIAlertController(title: "Can't edit string-options here.", message: "Sorry, haven't built out the floating UI for it yet!", preferredStyle: .alert)
-			alert.addAction(UIAlertAction(title: "Dismiss", style: .default, handler: nil))
-			present(alert, animated: true, completion: nil)
+        case .stringList:
+            if let alert = self.stringListAlert(for: tweak) {
+                present(alert, animated: true, completion: nil)
+            } else {
+                let alert = UIAlertController(title: "Can't edit string-options with more than 10 options here.", message: "Sorry, haven't built out the floating UI for it yet!", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "Dismiss", style: .default, handler: nil))
+                present(alert, animated: true, completion: nil)
+            }
 		case .boolean, .integer, .cgFloat, .double:
 			break
 		}
 	}
+    
+    private func stringListAlert(for tweak: AnyTweak) -> UIAlertController? {
+        let viewData = self.tweakStore.currentViewDataForTweak(tweak)
+        guard case let .stringList(value, defaultValue, options) = viewData, options.count <= 10 else {
+            return nil
+        }
+        
+        let alert = UIAlertController(title: tweak.tweakName, message: nil, preferredStyle: .alert)
+        
+        for option in options {
+            alert.addAction(UIAlertAction(title: option.value, style: .default, handler: { action in
+                self.tweakStore.setValue(.stringList(value: option, defaultValue: defaultValue, options: options), forTweak: tweak)
+                self.tableView.reloadData()
+            }))
+        }
+        
+        return alert
+    }
 }
 
 extension FloatingTweakGroupViewController: UITableViewDataSource {

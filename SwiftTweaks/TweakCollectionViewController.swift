@@ -15,7 +15,7 @@ internal protocol TweakCollectionViewControllerDelegate {
 
 /// Displays the contents of a TweakCollection in a table - each child TweakGroup gets a section, each Tweak<T> gets a cell.
 internal final class TweakCollectionViewController: UIViewController {
-	fileprivate let tweakCollection: TweakCollection
+	internal let tweakCollection: TweakCollection
 	fileprivate let tweakStore: TweakStore
 
 	fileprivate let delegate: TweakCollectionViewControllerDelegate
@@ -26,11 +26,14 @@ internal final class TweakCollectionViewController: UIViewController {
 		return tableView
 	}()
 
+    private var collapsed: [Bool]
+    
 	init(tweakCollection: TweakCollection, tweakStore: TweakStore, delegate: TweakCollectionViewControllerDelegate) {
 		self.tweakCollection = tweakCollection
 		self.tweakStore = tweakStore
 		self.delegate = delegate
-
+        self.collapsed = [Bool](repeating: false, count: tweakCollection.tweakGroups.count)
+        
 		super.init(nibName: nil, bundle: nil)
 
 		title = tweakCollection.title
@@ -77,17 +80,17 @@ internal final class TweakCollectionViewController: UIViewController {
 	// MARK: Events
 
 	@objc private func handleKeyboardVisibilityChange(_ notification: Notification) {
-		if
-			let userInfo = notification.userInfo,
-			let keyboardSize = userInfo[UIKeyboardFrameEndUserInfoKey] as? CGRect,
-			let animationDuration = userInfo[UIKeyboardAnimationDurationUserInfoKey] as? NSNumber
-		{
-			UIView.animate(
-				withDuration: animationDuration.doubleValue,
-				animations: {
-					self.tableView.contentInset.bottom = keyboardSize.height
-			})
-		}
+//        if
+//            let userInfo = notification.userInfo,
+//            let keyboardSize = userInfo[UIKeyboardFrameEndUserInfoKey] as? CGRect,
+//            let animationDuration = userInfo[UIKeyboardAnimationDurationUserInfoKey] as? NSNumber
+//        {
+//            UIView.animate(
+//                withDuration: animationDuration.doubleValue,
+//                animations: {
+//                    self.tableView.contentInset.bottom = keyboardSize.height
+//            })
+//        }
 	}
 
 	@objc private func dismissButtonTapped() {
@@ -144,17 +147,44 @@ extension TweakCollectionViewController: UITableViewDelegate {
         let headerView = tableView.dequeueReusableHeaderFooterView(withIdentifier: TweakGroupSectionHeader.identifier) as! TweakGroupSectionHeader
         headerView.tweakGroup = tweakCollection.sortedTweakGroups[section]
         headerView.delegate = self
+        headerView.tag = section
         return headerView
     }
 }
 
 extension TweakCollectionViewController: UITableViewDataSource {
+    private func expandCollapsed(to section: Int) {
+        let extra = (section - collapsed.count) + 1
+        if extra > 0 {
+            collapsed.append(contentsOf: [Bool](repeating: false, count: extra))
+        }
+    }
+    
+    private func isSectionCollapsed(_ section: Int) -> Bool {
+        expandCollapsed(to: section)
+        return collapsed[section]
+    }
+    
+    private func setSection(_ section: Int, isCollapsed: Bool) {
+        expandCollapsed(to: section)
+        collapsed[section] = isCollapsed
+    }
+    
+    private func toggleSectionCollapsed(_ section: Int) {
+        expandCollapsed(to: section)
+        collapsed[section] = !collapsed[section]
+    }
+    
 	func numberOfSections(in tableView: UITableView) -> Int {
 		return tweakCollection.tweakGroups.count
 	}
 
 	func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-		return tweakCollection.sortedTweakGroups[section].tweaks.count
+        if isSectionCollapsed(section) {
+            return 0
+        } else {
+            return tweakCollection.sortedTweakGroups[section].tweaks.count
+        }
 	}
 
 	func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -197,6 +227,11 @@ extension TweakCollectionViewController: StringOptionViewControllerDelegate {
 }
 
 extension TweakCollectionViewController: TweakGroupSectionHeaderDelegate {
+    fileprivate func tweakGroupSectionHeaderDidTapTitle(_ sectionHeader: TweakGroupSectionHeader) {
+        toggleSectionCollapsed(sectionHeader.tag)
+        tableView.reloadSections(IndexSet(integer: sectionHeader.tag), with: .automatic)
+    }
+    
 	fileprivate func tweakGroupSectionHeaderDidPressFloatingButton(_ sectionHeader: TweakGroupSectionHeader) {
 		guard let tweakGroup = sectionHeader.tweakGroup else { return }
 
@@ -205,6 +240,7 @@ extension TweakCollectionViewController: TweakGroupSectionHeaderDelegate {
 }
 
 private protocol TweakGroupSectionHeaderDelegate: class {
+    func tweakGroupSectionHeaderDidTapTitle(_ sectionHeader: TweakGroupSectionHeader)
 	func tweakGroupSectionHeaderDidPressFloatingButton(_ sectionHeader: TweakGroupSectionHeader)
 }
 
@@ -243,6 +279,9 @@ fileprivate final class TweakGroupSectionHeader: UITableViewHeaderFooterView {
 
 		contentView.addSubview(floatingButton)
 		contentView.addSubview(titleLabel)
+        
+        let tap = UITapGestureRecognizer(target: self, action: #selector(self.titleTapped))
+        contentView.addGestureRecognizer(tap)
 	}
 	
 	required init?(coder aDecoder: NSCoder) {
@@ -278,6 +317,10 @@ fileprivate final class TweakGroupSectionHeader: UITableViewHeaderFooterView {
 		titleLabel.frame = titleLabelFrame
 	}
 
+    @objc private func titleTapped() {
+        delegate!.tweakGroupSectionHeaderDidTapTitle(self)
+    }
+    
 	@objc private func floatingButtonTapped() {
 		delegate!.tweakGroupSectionHeaderDidPressFloatingButton(self)
 	}

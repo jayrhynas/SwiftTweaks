@@ -40,6 +40,7 @@ internal protocol Roundable {
 extension Roundable {
 	func stringValueRoundedToNearest(_ precisionLevel: PrecisionLevel) -> String {
 		let numberFormatter = NumberFormatter()
+        numberFormatter.minimumIntegerDigits = 1
 		numberFormatter.maximumFractionDigits = precisionLevel.maximumFractionDigits
         return numberFormatter.string(from: NSNumber(value: doubleValue))!
 	}

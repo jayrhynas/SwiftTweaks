@@ -12,6 +12,8 @@ import Foundation
 public struct AnyTweak: TweakType {
 	public let tweak: TweakType
 
+    public let index: Int
+    
 	public var collectionName: String { return tweak.collectionName }
 	public var groupName: String { return tweak.groupName }
 	public var tweakName: String { return tweak.tweakName }
@@ -20,8 +22,13 @@ public struct AnyTweak: TweakType {
 	public var tweakDefaultData: TweakDefaultData { return tweak.tweakDefaultData }
 
 	public init(tweak: TweakType) {
-		self.tweak = tweak.tweak
+        self.init(tweak: tweak, index: -1)
 	}
+    
+    public init(tweak: TweakType, index: Int) {
+        self.tweak = tweak.tweak
+        self.index = index
+    }
 }
 
 /// When combined with AnyTweak, this provides our type-erasure around Tweak<T>

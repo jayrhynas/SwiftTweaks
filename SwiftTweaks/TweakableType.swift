@@ -37,8 +37,8 @@ public enum TweakViewDataType {
 public enum TweakDefaultData {
 	case boolean(defaultValue: Bool)
 	case integer(defaultValue: Int, min: Int?, max: Int?, stepSize: Int?)
-	case float(defaultValue: CGFloat, min: CGFloat?, max: CGFloat?, stepSize: CGFloat?)
-	case doubleTweak(defaultValue: Double, min: Double?, max: Double?, stepSize: Double?)
+    case float(defaultValue: CGFloat, min: CGFloat?, max: CGFloat?, stepSize: CGFloat?, transform: TweakValueTransform?)
+    case doubleTweak(defaultValue: Double, min: Double?, max: Double?, stepSize: Double?, transform: TweakValueTransform?)
 	case color(defaultValue: UIColor)
 	case stringList(defaultValue: StringOption, options: [StringOption])
 }

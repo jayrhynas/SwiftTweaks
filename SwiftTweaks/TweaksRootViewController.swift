@@ -11,7 +11,7 @@ import UIKit
 
 internal protocol TweaksRootViewControllerDelegate {
 	func tweaksRootViewControllerDidPressDismissButton(_ tweaksRootViewController: TweaksRootViewController)
-	func tweaksRootViewController(_ tweaksRootViewController: TweaksRootViewController, requestsFloatingUIForTweakGroup tweakGroup: TweakGroup)
+    func tweaksRootViewController(_ tweaksRootViewController: TweaksRootViewController, requestsFloatingUIForTweakGroup tweakGroup: TweakGroup, inTweakCollection tweakCollection: TweakCollection)
 }
 
 /// A "container" view controller with two states: listing out the TweakCollections, or displaying the TweakBackups
@@ -142,6 +142,6 @@ extension TweaksRootViewController: TweakCollectionViewControllerDelegate {
 	}
 
 	func tweakCollectionViewController(_ tweakCollectionViewController: TweakCollectionViewController, didTapFloatingTweakGroupButtonForTweakGroup tweakGroup: TweakGroup) {
-		delegate.tweaksRootViewController(self, requestsFloatingUIForTweakGroup: tweakGroup)
+        delegate.tweaksRootViewController(self, requestsFloatingUIForTweakGroup: tweakGroup, inTweakCollection: tweakCollectionViewController.tweakCollection)
 	}
 }

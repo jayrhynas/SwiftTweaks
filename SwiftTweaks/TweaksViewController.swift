@@ -47,9 +47,9 @@ extension TweaksViewController: TweaksRootViewControllerDelegate {
 		delegate.tweaksViewControllerRequestsDismiss(self, completion: nil)
 	}
 
-	internal func tweaksRootViewController(_ tweaksRootViewController: TweaksRootViewController, requestsFloatingUIForTweakGroup tweakGroup: TweakGroup) {
+    internal func tweaksRootViewController(_ tweaksRootViewController: TweaksRootViewController, requestsFloatingUIForTweakGroup tweakGroup: TweakGroup, inTweakCollection tweakCollection: TweakCollection) {
 		delegate.tweaksViewControllerRequestsDismiss(self) {
-			self.floatingTweaksWindowPresenter?.presentFloatingTweaksUI(forTweakGroup: tweakGroup)
+            self.floatingTweaksWindowPresenter?.presentFloatingTweaksUI(forTweakGroup: tweakGroup, inTweakCollection: tweakCollection)
 		}
 	}
 }

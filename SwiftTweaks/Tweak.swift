@@ -21,9 +21,10 @@ public struct Tweak<T: TweakableType> {
 	internal let minimumValue: T?	// Only supported for T: Comparable
 	internal let maximumValue: T?	// Only supported for T: Comparable
 	internal let stepSize: T?		// Only supported for T: Comparable
+    internal let transform: TweakValueTransform? // Only supported for T: Double or T: CGFloat
 	internal let options: [T]?		// Only supported for T: StringOption
-
-	internal init(collectionName: String, groupName: String, tweakName: String, defaultValue: T, minimumValue: T? = nil, maximumValue: T? = nil, stepSize: T? = nil, options: [T]? = nil) {
+    
+    internal init(collectionName: String, groupName: String, tweakName: String, defaultValue: T, minimumValue: T? = nil, maximumValue: T? = nil, stepSize: T? = nil, transform: TweakValueTransform? = nil, options: [T]? = nil) {
 
 		[collectionName, groupName, tweakName].forEach {
 			if $0.contains(TweakIdentifierSeparator) {
@@ -38,6 +39,7 @@ public struct Tweak<T: TweakableType> {
 		self.minimumValue = minimumValue
 		self.maximumValue = maximumValue
 		self.stepSize = stepSize
+        self.transform = transform
 		self.options = options
 	}
 }
@@ -60,7 +62,7 @@ extension Tweak where T: Comparable {
 	/// Creates a Tweak<T> where T: Comparable
 	/// You can optionally provide a min / max / stepSize to restrict the bounds and behavior of a tweak.
 	/// The step size is "how much does the value change when I tap the UIStepper"
-	public init(_ collectionName: String, _ groupName: String, _ tweakName: String, defaultValue: T, min minimumValue: T? = nil, max maximumValue: T? = nil, stepSize: T? = nil) {
+    public init(_ collectionName: String, _ groupName: String, _ tweakName: String, defaultValue: T, min minimumValue: T? = nil, max maximumValue: T? = nil, stepSize: T? = nil, transform: TweakValueTransform? = nil) {
 
 		// Assert that the tweak's defaultValue is between its min and max (if they exist)
 		if clip(defaultValue, minimumValue, maximumValue) != defaultValue {
@@ -74,7 +76,8 @@ extension Tweak where T: Comparable {
 			defaultValue: defaultValue,
 			minimumValue: minimumValue,
 			maximumValue: maximumValue,
-			stepSize: stepSize
+			stepSize: stepSize,
+            transform: transform
 		)
 	}
 }
@@ -119,14 +122,16 @@ extension Tweak: TweakType {
 				defaultValue: defaultValue as! CGFloat,
 				min: minimumValue as? CGFloat,
 				max: maximumValue as? CGFloat,
-				stepSize: stepSize as? CGFloat
+				stepSize: stepSize as? CGFloat,
+                transform: transform
 			)
 		case .double:
 			return .doubleTweak(
 				defaultValue: defaultValue as! Double,
 				min: minimumValue as? Double,
 				max: maximumValue as? Double,
-				stepSize: stepSize as? Double
+				stepSize: stepSize as? Double,
+                transform: transform
 			)
 		case .uiColor:
 			return .color(defaultValue: defaultValue as! UIColor)
@@ -161,4 +166,19 @@ extension Tweak: TweakIdentifiable {
 /// Extend Tweak to support easy initialization of a TweakStore
 extension Tweak: TweakClusterType {
 	public var tweakCluster: [AnyTweak] { return [AnyTweak.init(tweak: self)] }
+}
+
+/// Allow non-linear mapping between UI values and actual values
+public struct TweakValueTransform {
+    public let toLinear: (Double, Double, Double) -> Double
+    public let fromLinear: (Double, Double, Double) -> Double
+    
+    public static let logarithmic = TweakValueTransform(
+        toLinear: { value, min, max in
+            log2(value / min) / log2(max / min)
+        },
+        fromLinear: { value, min, max in
+            pow(2, value * log2(max / min)) * min
+        }
+    )
 }

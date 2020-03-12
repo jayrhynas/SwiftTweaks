@@ -15,12 +15,14 @@ public struct ComparableTweakDefaultParameters<T: Comparable> {
 	public let minValue: T?
 	public let maxValue: T?
 	public let stepSize: T?
-
-	public init(defaultValue: T, minValue: T? = nil, maxValue: T? = nil, stepSize: T? = nil) {
+    public let transform: TweakValueTransform?
+    
+    public init(defaultValue: T, minValue: T? = nil, maxValue: T? = nil, stepSize: T? = nil, transform: TweakValueTransform? = nil) {
 		self.defaultValue = defaultValue
 		self.minValue = minValue
 		self.maxValue = maxValue
 		self.stepSize = stepSize
+        self.transform = transform
 	}
 }
 
@@ -33,7 +35,8 @@ public extension Tweak where T: Comparable {
 			defaultValue: customDefaultValue ?? defaultParameters.defaultValue,
 			minimumValue: defaultParameters.minValue,
 			maximumValue: defaultParameters.maxValue,
-			stepSize: defaultParameters.stepSize
+			stepSize: defaultParameters.stepSize,
+            transform: defaultParameters.transform
 		)
 	}
 }

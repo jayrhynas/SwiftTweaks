@@ -38,16 +38,19 @@ public final class TweakStore {
 		self.persistence = TweakPersistency(identifier: storeName)
 		self.storeName = storeName
 		self.enabled = enabled
-		self.allTweaks = Set(tweaks.reduce([]) { $0 + $1.tweakCluster })
-
-		self.allTweaks.forEach { tweak in
+        
+        var collections: [String: TweakCollection] = [:]
+        
+        let allTweaks = tweaks.reduce([]) { $0 + $1.tweakCluster }
+		allTweaks.forEach { tweak in
 			// Find or create its TweakCollection
 			var tweakCollection: TweakCollection
-			if let existingCollection = tweakCollections[tweak.collectionName] {
+			if let existingCollection = collections[tweak.collectionName] {
 				tweakCollection = existingCollection
 			} else {
-				tweakCollection = TweakCollection(title: tweak.collectionName)
-				tweakCollections[tweakCollection.title] = tweakCollection
+                tweakCollection = TweakCollection(title: tweak.collectionName,
+                                                  index: collections.count)
+				collections[tweakCollection.title] = tweakCollection
 			}
 
 			// Find or create its TweakGroup
@@ -55,14 +58,18 @@ public final class TweakStore {
 			if let existingGroup = tweakCollection.tweakGroups[tweak.groupName] {
 				tweakGroup = existingGroup
 			} else {
-				tweakGroup = TweakGroup(title: tweak.groupName)
+				tweakGroup = TweakGroup(title: tweak.groupName,
+                                        index: tweakCollection.tweakGroups.count)
 			}
 
 			// Add the tweak to the tree
 			tweakGroup.tweaks[tweak.tweakName] = tweak
 			tweakCollection.tweakGroups[tweakGroup.title] = tweakGroup
-			tweakCollections[tweakCollection.title] = tweakCollection
+			collections[tweakCollection.title] = tweakCollection
 		}
+        
+        self.tweakCollections = collections
+        self.allTweaks = Set(allTweaks)
 	}
 
 	/// Returns the current value for a given tweak
@@ -144,12 +151,12 @@ public final class TweakStore {
 		case let .integer(defaultValue: defaultValue, min: min, max: max, stepSize: step):
 			let currentValue = cachedValue as? Int ?? defaultValue
 			return .integer(value: currentValue, defaultValue: defaultValue, min: min, max: max, stepSize: step)
-		case let .float(defaultValue: defaultValue, min: min, max: max, stepSize: step):
+		case let .float(defaultValue: defaultValue, min: min, max: max, stepSize: step, transform):
 			let currentValue = cachedValue as? CGFloat ?? defaultValue
-			return .float(value: currentValue, defaultValue: defaultValue, min: min, max: max, stepSize: step)
-		case let .doubleTweak(defaultValue: defaultValue, min: min, max: max, stepSize: step):
+            return .float(value: currentValue, defaultValue: defaultValue, min: min, max: max, stepSize: step, transform: transform)
+		case let .doubleTweak(defaultValue: defaultValue, min: min, max: max, stepSize: step, transform):
 			let currentValue = cachedValue as? Double ?? defaultValue
-			return .doubleTweak(value: currentValue, defaultValue: defaultValue, min: min, max: max, stepSize: step)
+            return .doubleTweak(value: currentValue, defaultValue: defaultValue, min: min, max: max, stepSize: step, transform: transform)
 		case let .color(defaultValue: defaultValue):
 			let currentValue = cachedValue as? UIColor ?? defaultValue
 			return .color(value: currentValue, defaultValue: defaultValue)
@@ -186,7 +193,13 @@ public final class TweakStore {
 extension TweakStore {
 	internal var sortedTweakCollections: [TweakCollection] {
 		return tweakCollections
-			.sorted { $0.0 < $1.0 }
+			.sorted { lhs, rhs in
+                if lhs.value.index == rhs.value.index {
+                    return lhs.key < rhs.key
+                } else {
+                    return lhs.value.index < rhs.value.index
+                }
+            }
 			.map { return $0.1 }
 	}
 }
