@@ -37,6 +37,15 @@ internal final class FloatingTweakGroupViewController: UIViewController {
         titleLabel.text = [tweakCollection?.title, tweakGroup?.title].compactMap { $0 }.joined(separator: " | ")
     }
 
+	static func editingSupported(forTweak tweak: AnyTweak) -> Bool {
+		switch tweak.tweakViewDataType {
+		case .boolean, .integer, .cgFloat, .double:
+			return true
+		case .uiColor, .stringList, .string:
+			return false
+		}
+	}
+
 	private let presenter: FloatingTweaksWindowPresenter
 	fileprivate let tweakStore: TweakStore
 	private var fullFrame: CGRect
@@ -173,7 +182,7 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 	private let closeButton: UIButton = {
 		let button = UIButton()
 		let buttonImage = UIImage(swiftTweaksImage: .floatingCloseButton).withRenderingMode(.alwaysTemplate)
-		button.setImage(buttonImage.imageTintedWithColor(AppTheme.Colors.controlTinted), for: UIControlState())
+		button.setImage(buttonImage.imageTintedWithColor(AppTheme.Colors.controlTinted), for: UIControl.State())
 		button.setImage(buttonImage.imageTintedWithColor(AppTheme.Colors.controlTintedPressed), for: .highlighted)
 		return button
 	}()
@@ -190,7 +199,7 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 	fileprivate let restoreButton: UIButton = {
 		let button = UIButton()
 		let buttonImage = UIImage(swiftTweaksImage: .floatingMinimizedArrow).withRenderingMode(.alwaysTemplate)
-		button.setImage(buttonImage.imageTintedWithColor(AppTheme.Colors.controlSecondary), for: UIControlState())
+		button.setImage(buttonImage.imageTintedWithColor(AppTheme.Colors.controlSecondary), for: UIControl.State())
 		button.setImage(buttonImage.imageTintedWithColor(AppTheme.Colors.controlSecondaryPressed), for: .highlighted)
 		button.isHidden = true
 		return button
@@ -280,7 +289,7 @@ internal final class FloatingTweakGroupViewController: UIViewController {
     private var prevCorner: Corner?
     
     private func setupKeyboardNotifications() {
-        NotificationCenter.default.addObserver(forName: .UIKeyboardWillShow, object: nil, queue: .main) { notif in
+		NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { notif in
             if self.corner.v == .bottom {
                 self.prevCorner = self.corner
                 
@@ -292,7 +301,7 @@ internal final class FloatingTweakGroupViewController: UIViewController {
             }
         }
         
-        NotificationCenter.default.addObserver(forName: .UIKeyboardWillHide, object: nil, queue: .main) { notif in
+        NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { notif in
             if let prev = self.prevCorner {
                 self.animateAlongsideKeyboard(notification: notif, animations: { animated in
                     self.restore(to: prev, animated: !animated)
@@ -303,15 +312,15 @@ internal final class FloatingTweakGroupViewController: UIViewController {
     
     private func animateAlongsideKeyboard(notification: Notification, animations: @escaping (Bool) -> Void, completion: ((Bool) -> Void)?) {
         guard let userInfo = notification.userInfo,
-              let duration = userInfo[UIKeyboardAnimationDurationUserInfoKey] as? Double,
-              let curve    = userInfo[UIKeyboardAnimationCurveUserInfoKey] as? UInt
+			  let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
+			  let curve    = userInfo[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt
         else {
             animations(false)
             completion?(true)
             return
         }
         
-        let options = UIViewAnimationOptions(rawValue: curve) ?? []
+		let options = UIView.AnimationOptions(rawValue: curve) ?? []
         UIView.animate(withDuration: duration, delay: 0, options: options, animations: {
             animations(true)
         }, completion: completion)
@@ -490,27 +499,19 @@ extension FloatingTweakGroupViewController: UIGestureRecognizerDelegate {
 extension FloatingTweakGroupViewController: UITableViewDelegate {
 	@objc func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
 		guard let tweak = tweakAtIndexPath(indexPath) else { return }
-		switch tweak.tweakViewDataType {
-		case .uiColor:
-			let alert = UIAlertController(title: "Can't edit colors here.", message: "Sorry, haven't built out the floating UI for it yet!", preferredStyle: .alert)
+
+        if let alert = self.stringListAlert(for: tweak) {
+            present(alert, animated: true, completion: nil)
+        } else if !FloatingTweakGroupViewController.editingSupported(forTweak: tweak) {
+			let alert = UIAlertController(title: "Can't edit this tweak here.", message: "You can edit it back in the main view, though!", preferredStyle: .alert)
 			alert.addAction(UIAlertAction(title: "Dismiss", style: .default, handler: nil))
 			present(alert, animated: true, completion: nil)
-        case .stringList:
-            if let alert = self.stringListAlert(for: tweak) {
-                present(alert, animated: true, completion: nil)
-            } else {
-                let alert = UIAlertController(title: "Can't edit string-options with more than 10 options here.", message: "Sorry, haven't built out the floating UI for it yet!", preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: "Dismiss", style: .default, handler: nil))
-                present(alert, animated: true, completion: nil)
-            }
-		case .boolean, .integer, .cgFloat, .double:
-			break
 		}
 	}
     
     private func stringListAlert(for tweak: AnyTweak) -> UIAlertController? {
         let viewData = self.tweakStore.currentViewDataForTweak(tweak)
-        guard case let .stringList(value, defaultValue, options) = viewData, options.count <= 10 else {
+        guard case let .stringList(_, defaultValue, options) = viewData, options.count <= 10 else {
             return nil
         }
         

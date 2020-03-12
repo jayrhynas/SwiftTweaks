@@ -35,7 +35,7 @@ class ViewController: UIViewController {
 
 	private let bounceButton: UIButton = {
 		let button = UIButton()
-		button.setTitle("Animate", for: UIControlState())
+		button.setTitle("Animate", for: UIControl.State())
 		button.layer.cornerRadius = 5
 		button.contentEdgeInsets = UIEdgeInsets(top: 14, left: 32, bottom: 14, right: 32)
 		return button
@@ -70,10 +70,14 @@ class ViewController: UIViewController {
 			self.titleLabel.font = UIFont.systemFont(ofSize: fontSize)
 		})
 
-        let binding = ExampleTweaks.bind(ExampleTweaks.title) { (title: StringOption) in
-            self.titleLabel.text = title.value
-        }
+		let binding = ExampleTweaks.bind(ExampleTweaks.title) { (title: StringOption) in
+			self.titleLabel.text = title.value
+		}
 		tweakBindings.insert(binding)
+
+		tweakBindings.insert(ExampleTweaks.bind(ExampleTweaks.subtitle) { subtitle in
+			self.subtitleLabel.text = subtitle
+		})
 
 		// Now let's look at a trickier example: let's say that you have a layout, and it depends on multiple tweaks. 
 		// In our case, we have tweaks for two font sizes, as well as two layout parameters (horizontal margins and vertical padding between the labels). 
