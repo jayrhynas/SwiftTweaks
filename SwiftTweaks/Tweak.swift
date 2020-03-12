@@ -55,6 +55,15 @@ extension Tweak {
 			defaultValue: defaultValue
 		)
 	}
+	
+	public init(_ collectionName: String, _ groupName: String, _ tweakName: String, _ defaultValueProvider: () -> T) {
+		self.init(
+			collectionName: collectionName,
+			groupName: groupName,
+			tweakName: tweakName,
+			defaultValue: defaultValueProvider()
+		)
+	}
 
 }
 
@@ -141,6 +150,10 @@ extension Tweak: TweakType {
 			return .stringList(
 				defaultValue: defaultValue as! StringOption,
 				options: options!.map { $0 as! StringOption }
+			)
+		case .action:
+			return .action(
+				defaultValue: defaultValue as! TweakAction
 			)
 		}
 	}
