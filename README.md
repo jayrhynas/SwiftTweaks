@@ -15,7 +15,7 @@ These animation timings, font sizes, and color choices are all examples of “ma
 [![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage)
 [![Version](http://img.shields.io/cocoapods/v/SwiftTweaks.svg)](http://cocoapods.org/?q=SwiftTweaks)
 [![GitHub release](https://img.shields.io/github/release/Khan/SwiftTweaks.svg)](https://github.com/Khan/SwiftTweaks/releases)
-![Swift 4.2](https://img.shields.io/badge/Swift-4.2-orange.svg)
+![Swift 5.0](https://img.shields.io/badge/Swift-5.0-orange.svg)
 ![platforms](https://img.shields.io/badge/platforms-iOS%20-lightgrey.svg)
 [![Build Status](https://travis-ci.org/Khan/SwiftTweaks.svg?branch=master)](https://travis-ci.org/Khan/SwiftTweaks)
 
@@ -30,7 +30,7 @@ Currently, you can tweak the following types:
 - `CGFloat`
 - `Double`
 - `UIColor`
-- [`TweakCallbacks`](#callbacks)
+- [`TweakAction`](#Actions)
 - `String`
 - `StringOption`
 
@@ -64,28 +64,27 @@ Of course, you can create your own `TweakGroupTemplate` type if you'd like - the
 
 ![Tweaks](https://github.com/Khan/SwiftTweaks/blob/master/Images/SwiftTweaks%20Demo.gif?raw=true)
 
-### Callbacks
+### Actions
 
-SwiftTweaks now supports callbacks. If you need to execute more complicated operations or operations that do not depend on data from certain tweak value.
-You can use `TweakCallbacks` as a type in your `TweakStore` to create a Tweak that executed your custom callbacks.
+SwiftTweaks now supports closures, so you can perform actions that do not depend on data from SwiftTweaks. To do this, use `TweakAction` as a type in your `TweakStore` to create a Tweak that executes your custom closures:
 
 ```swift
-public static let action = Tweak<TweakCallbacks>("Actions", "Action", "Perform some action")
+public static let action = Tweak<TweakAction>("Actions", "Action", "Perform some action")
 ```
 
-Later in the code you can add callbacks to that tweak, which are executed when a button in Tweaks window is pressed.
+Later in the code you can add closures to that tweak, which are executed when a button in Tweaks window is pressed.
 
 ```swift
-let idenfitier = ExampleTweaks.action.addCallback {
+let idenfitier = ExampleTweaks.action.addClosure {
 	/// Some complicated action happens here
 	print("We're all done!")
 }
 ```
 
-If you want to, you can also always remove callback using unique idenfitier that `addCallback` method provides.
+If you want to, you can also always remove closure using unique idenfitier that `addClosure` method provides.
 
 ```swift
-ExampleTweaks.action.removeCallback(with: idenfitier)
+ExampleTweaks.action.removeClosure(with: idenfitier)
 ```
 
 ### Wait, what about [Facebook Tweaks](https://github.com/facebook/Tweaks)?
@@ -113,7 +112,8 @@ public struct ExampleTweaks: TweakLibraryType {
 	public static let colorTint = Tweak("General", "Colors", "Tint", UIColor.blue)
 	public static let marginHorizontal = Tweak<CGFloat>("General", "Layout", "H. Margins", defaultValue: 15, min: 0)
 	public static let marginVertical = Tweak<CGFloat>("General", "Layout", "V. Margins", defaultValue: 10, min: 0)
-	public static let featureFlagMainScreenHelperText = Tweak("Feature Flags", "Main Screen", "Show Body Text", true)
+	public static let font = Tweak<StringOption>("General", "Layout", "Font", options: ["AvenirNext", "Helvetica", "SanFrancisco"])
+	public static let featureFlagMainScreenHelperText = Tweak<Bool>("Feature Flags", "Main Screen", "Show Body Text", true)
 
 	public static let buttonAnimation = SpringAnimationTweakTemplate("Animation", "Button Animation")
 
@@ -132,7 +132,7 @@ public struct ExampleTweaks: TweakLibraryType {
 
 Let’s break down what happened here:
 
-- We have four tweaks in `ExampleTweaks`: a tint color, two `CGFloat`s for layout, and a `Bool` that toggles an in-development feature.
+- We have five tweaks in `ExampleTweaks`: a tint color, two `CGFloat`s for layout, a `StringOption` for font choice, and a `Bool` that toggles an in-development feature.
 - The compiler can get confused between `Int`, `CGFloat`, and `Double` - so you might find it necessary to tell the `Tweak<T>` what type its `T` is - as we do here with our margin tweaks.
 - We create a `defaultStore` by creating a `TweakStore`, which needs to know whether tweaks are `enabled`, and a list of all `tweaks`.
 - The `enabled` flag on `TweakStore` exists so that `SwiftTweaks` isn’t accessible by your users in production. You can set it however you like; we enjoy using the `DEBUG` flag from our project’s Build Settings.
@@ -214,7 +214,7 @@ end
 
 Nope! Wherever/however you prefer, just create a `TweaksViewController` like so:
 
-    let tweaksVC = TweaksViewController(tweakStore: ExampleTweaks.defaultStore)
+    let tweaksVC = TweaksViewController(tweakStore: ExampleTweaks.defaultStore, delegate: self)
 
 #### Can I have multiple `TweakLibraryType`s in my app?
 

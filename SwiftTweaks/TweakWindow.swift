@@ -42,7 +42,13 @@ import UIKit
 	fileprivate let tweakStore: TweakStore
 
 	/// We need to know if we're running in the simulator (because shake gestures don't have a time duration in the simulator)
-	private let runningInSimulator: Bool
+	private let runningInSimulator: Bool = {
+		#if targetEnvironment(simulator)
+			return true
+		#else
+			return false
+		#endif
+	}()
 
 	/// Whether or not the device is shaking. Used in determining when to present the Tweaks UI when the device is shaken.
 	private var shaking: Bool = false
@@ -62,37 +68,43 @@ import UIKit
 
 	public init(frame: CGRect, gestureType: GestureType? = .shake, tweakStore: TweakStore) {
 		self.gestureType = gestureType
-
 		self.tweakStore = tweakStore
-
-		// Are we running on a Mac? If so, then we're in a simulator!
-		#if (arch(i386) || arch(x86_64))
-			self.runningInSimulator = true
-		#else
-			self.runningInSimulator = false
-		#endif
 
 		super.init(frame: frame)
 
-		tintColor = AppTheme.Colors.controlTinted
+		commonInit(tweakStore: tweakStore)
+	}
 
-		if tweakStore.enabled, let gestureType = gestureType {
-			switch gestureType {
-			case .gesture(let gestureRecognizer):
-				gestureRecognizer.addTarget(self, action: #selector(self.presentTweaks))
-			case .twoFingerDoubleTap:
-				let twoFingerDoubleTapGesture = UITapGestureRecognizer()
-				twoFingerDoubleTapGesture.numberOfTapsRequired = 2
-				twoFingerDoubleTapGesture.numberOfTouchesRequired = 2
-				twoFingerDoubleTapGesture.addTarget(self, action: #selector(self.presentTweaks))
-				self.addGestureRecognizer(twoFingerDoubleTapGesture)
-			case .shake:
-				break
+    @available(iOS 13.0, *)
+    public init(windowScene: UIWindowScene, gestureType: GestureType = .shake, tweakStore: TweakStore) {
+        self.gestureType = gestureType
+        self.tweakStore = tweakStore
+
+        super.init(windowScene: windowScene)
+
+		commonInit(tweakStore: tweakStore)
+    }
+	
+	private func commonInit(tweakStore: TweakStore) {
+        tintColor = AppTheme.Colors.controlTinted
+
+		if tweakStore.enabled, let gestureType = self.gestureType {
+            switch gestureType {
+            case .gesture(let gestureRecognizer):
+                gestureRecognizer.addTarget(self, action: #selector(self.presentTweaks))
+            case .twoFingerDoubleTap:
+                let twoFingerDoubleTapGesture = UITapGestureRecognizer()
+                twoFingerDoubleTapGesture.numberOfTapsRequired = 2
+                twoFingerDoubleTapGesture.numberOfTouchesRequired = 2
+                twoFingerDoubleTapGesture.addTarget(self, action: #selector(self.presentTweaks))
+                self.addGestureRecognizer(twoFingerDoubleTapGesture)
+            case .shake:
+                break
 			}
-		}
+        }
 
-		tweaksViewController = TweaksViewController(tweakStore: tweakStore, delegate: self)
-		tweaksViewController.floatingTweaksWindowPresenter = self
+        tweaksViewController = TweaksViewController(tweakStore: tweakStore, delegate: self)
+        tweaksViewController.floatingTweaksWindowPresenter = self
 	}
 
 	public required init?(coder aDecoder: NSCoder) {
@@ -208,8 +220,8 @@ extension TweakWindow: FloatingTweaksWindowPresenter {
 		window.addSubview(floatingTweaksVC.view)
 
 		window.alpha = 0
-		let initialWindowFrame = window.frame.offsetBy(dx: 0, dy: floatingTweaksVC.view.bounds.height)
-		let destinationWindowFrame = window.frame
+		let destinationWindowFrame = floatingTweaksVC.view.frame
+		let initialWindowFrame = destinationWindowFrame.offsetBy(dx: 0, dy: floatingTweaksVC.view.bounds.height)
 		window.makeKeyAndVisible()
 		floatingTweakGroupUIWindow = window
 

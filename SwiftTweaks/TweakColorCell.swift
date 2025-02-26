@@ -8,7 +8,7 @@
 
 import UIKit
 
-internal protocol TweakColorCellDelegate {
+internal protocol TweakColorCellDelegate: class {
 	func tweakColorCellDidChangeValue(_ cell: TweakColorCell)
 }
 
@@ -16,7 +16,7 @@ internal protocol TweakColorCellDelegate {
 internal final class TweakColorCell: UITableViewCell {
 	internal static let cellHeight: CGFloat = 50
 
-	internal var delegate: TweakColorCellDelegate?
+	internal unowned var delegate: TweakColorCellDelegate?
 
 	internal var viewData: ColorComponent? {
 		didSet {
@@ -28,7 +28,11 @@ internal final class TweakColorCell: UITableViewCell {
 	private let label: UILabel = {
 		let label = UILabel()
 		label.textAlignment = .right
-		label.textColor = UIColor.lightGray
+		if #available(iOS 13.0, *) {
+			label.textColor = UIColor.secondaryLabel
+		} else {
+			label.textColor = UIColor.lightGray
+		}
 		return label
 	}()
 	private let textField: UITextField = {

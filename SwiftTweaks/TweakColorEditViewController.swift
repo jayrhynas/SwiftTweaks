@@ -8,7 +8,7 @@
 
 import UIKit
 
-internal protocol TweakColorEditViewControllerDelegate {
+internal protocol TweakColorEditViewControllerDelegate: class {
 	func tweakColorEditViewControllerDidPressDismissButton(_ tweakColorEditViewController: TweakColorEditViewController)
 }
 
@@ -16,7 +16,7 @@ internal protocol TweakColorEditViewControllerDelegate {
 internal final class TweakColorEditViewController: UIViewController {
 	private let tweak: Tweak<UIColor>
 	private let tweakStore: TweakStore
-	private let delegate: TweakColorEditViewControllerDelegate
+	private unowned var delegate: TweakColorEditViewControllerDelegate
 
 	fileprivate var viewData: ColorRepresentation {
 		didSet {
@@ -147,7 +147,7 @@ internal final class TweakColorEditViewController: UIViewController {
 	}
 
 	private func updateColorPreview() {
-		colorPreviewView.backgroundColor = .clear
+		colorPreviewView.backgroundColor = UIColor.white
 		colorPreviewSolidView.backgroundColor = viewData.color.withAlphaComponent(1.0)
 		colorPreviewAlphaView.backgroundColor = viewData.color
 	}
@@ -198,28 +198,44 @@ extension TweakColorEditViewController: TweakColorCellDelegate {
 				viewData = .hex(hex: oldHex, alpha: newNumber)
 			}
 		case let .rgBa(r: oldR, g: oldG, b: oldB, a: oldA):
-			switch changedValue.numericType! {
+			// NOTE : See discussion on https://github.com/Khan/SwiftTweaks/issues/152 for why this guard-statement is necessary
+			guard
+				let numericType = changedValue.numericType,
+				let numericValue = changedValue.numericValue
+			else {
+				return
+			}
+
+			switch numericType {
 			case .red:
-				viewData = .rgBa(r: changedValue.numericValue!, g: oldG, b: oldB, a: oldA)
+				viewData = .rgBa(r: numericValue, g: oldG, b: oldB, a: oldA)
 			case .green:
-				viewData = .rgBa(r: oldR, g: changedValue.numericValue!, b: oldB, a: oldA)
+				viewData = .rgBa(r: oldR, g: numericValue, b: oldB, a: oldA)
 			case .blue:
-				viewData = .rgBa(r: oldR, g: oldG, b: changedValue.numericValue!, a: oldA)
+				viewData = .rgBa(r: oldR, g: oldG, b: numericValue, a: oldA)
 			case .alpha:
-				viewData = .rgBa(r: oldR, g: oldG, b: oldB, a: changedValue.numericValue!)
+				viewData = .rgBa(r: oldR, g: oldG, b: oldB, a: numericValue)
 			case .hue, .saturation, .brightness:
 				break
 			}
 		case let .hsBa(h: oldH, s: oldS, b: oldB, a: oldA):
-			switch changedValue.numericType! {
+			// NOTE : See discussion on https://github.com/Khan/SwiftTweaks/issues/152 for why this guard-statement is necessary
+			guard
+				let numericType = changedValue.numericType,
+				let numericValue = changedValue.numericValue
+			else {
+				return
+			}
+
+			switch numericType {
 			case .hue:
-				viewData = .hsBa(h: changedValue.numericValue!, s: oldS, b: oldB, a: oldA)
+				viewData = .hsBa(h: numericValue, s: oldS, b: oldB, a: oldA)
 			case .saturation:
-				viewData = .hsBa(h: oldH, s: changedValue.numericValue!, b: oldB, a: oldA)
+				viewData = .hsBa(h: oldH, s: numericValue, b: oldB, a: oldA)
 			case .brightness:
-				viewData = .hsBa(h: oldH, s: oldS, b: changedValue.numericValue!, a: oldA)
+				viewData = .hsBa(h: oldH, s: oldS, b: numericValue, a: oldA)
 			case .alpha:
-				viewData = .hsBa(h: oldH, s: oldS, b: oldB, a: changedValue.numericValue!)
+				viewData = .hsBa(h: oldH, s: oldS, b: oldB, a: numericValue)
 			case .red, .green, .blue:
 				break
 			}

@@ -165,7 +165,7 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 
 	private let navBar: UIView = {
 		let view = UIView()
-		view.backgroundColor = AppTheme.Colors.floatingTweakGroupNavBG
+		view.backgroundColor = AppTheme.Colors.secondaryBackground
 
 		view.layer.shadowColor = AppTheme.Shadows.floatingNavShadowColor
 		view.layer.shadowOpacity = AppTheme.Shadows.floatingNavShadowOpacity
@@ -177,7 +177,7 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 
 	private let titleLabel: UILabel = {
 		let label = UILabel()
-		label.textColor = AppTheme.Colors.sectionHeaderTitleColor
+		label.textColor = AppTheme.Colors.textSecondary
 		label.font = AppTheme.Fonts.sectionHeaderTitleFont
 		return label
 	}()
@@ -225,7 +225,7 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 		view.layer.shadowOpacity = AppTheme.Shadows.floatingShadowOpacity
 
 		// Set up the background
-		view.backgroundColor = .white
+		view.backgroundColor = AppTheme.Colors.primaryBackground
 
 		// The table view
 		tableView.delegate = self
@@ -424,6 +424,8 @@ internal final class FloatingTweakGroupViewController: UIViewController {
 			} else {
 				restore()
 			}
+		@unknown default:
+			return
 		}
 	}
 
